@@ -8,6 +8,7 @@ import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import '../models/schedule_task.dart';
 import 'db_service.dart';
+import 'voice_note_player_service.dart';
 
 class AlarmRingtone {
   final String id;
@@ -325,10 +326,23 @@ class NotificationService {
     // 5. Initialize plugin with response handler to stop alarms on tap/action
     await _notificationsPlugin.initialize(
       settings: initializationSettings,
-      onDidReceiveNotificationResponse: (NotificationResponse response) {
+      onDidReceiveNotificationResponse: (NotificationResponse response) async {
         debugPrint('Notification response actionId: ${response.actionId}, id: ${response.id}');
         if (response.id != null) {
           _notificationsPlugin.cancel(id: response.id!);
+        }
+        if (response.payload != null) {
+          final taskId = int.tryParse(response.payload!);
+          if (taskId != null) {
+            try {
+              final task = await DBService.instance.getTaskById(taskId);
+              if (task != null && task.voiceNotePath != null) {
+                await VoiceNotePlayerService.instance.playIfEnabledForAlarm(task.voiceNotePath);
+              }
+            } catch (e) {
+              debugPrint('Error playing voice note on notification response: $e');
+            }
+          }
         }
       },
       onDidReceiveBackgroundNotificationResponse: notificationTapBackground,

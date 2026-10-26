@@ -23,12 +23,14 @@ class ScheduleTask {
   final String title;
   final DateTime scheduledTime;
   final String status; // 'pending', 'completed', 'cancelled'
+  final String? voiceNotePath; // Optional path to user's recorded audio note (.m4a)
 
   const ScheduleTask({
     this.id,
     required this.title,
     required this.scheduledTime,
     this.status = 'pending',
+    this.voiceNotePath,
   });
 
   bool get isPending => status == TaskStatus.pending.value;
@@ -43,6 +45,7 @@ class ScheduleTask {
       'title': title,
       'scheduledTime': scheduledTime.toIso8601String(),
       'status': status,
+      'voiceNotePath': voiceNotePath,
     };
     if (id != null) {
       map['id'] = id;
@@ -59,6 +62,7 @@ class ScheduleTask {
           ? DateTime.parse(map['scheduledTime'] as String)
           : DateTime.now(),
       status: map['status'] as String? ?? TaskStatus.pending.value,
+      voiceNotePath: map['voiceNotePath'] as String?,
     );
   }
 
@@ -68,18 +72,20 @@ class ScheduleTask {
     String? title,
     DateTime? scheduledTime,
     String? status,
+    String? voiceNotePath,
   }) {
     return ScheduleTask(
       id: id ?? this.id,
       title: title ?? this.title,
       scheduledTime: scheduledTime ?? this.scheduledTime,
       status: status ?? this.status,
+      voiceNotePath: voiceNotePath ?? this.voiceNotePath,
     );
   }
 
   @override
   String toString() {
-    return 'ScheduleTask(id: $id, title: $title, scheduledTime: $scheduledTime, status: $status)';
+    return 'ScheduleTask(id: $id, title: $title, scheduledTime: $scheduledTime, status: $status, voiceNotePath: $voiceNotePath)';
   }
 
   @override
@@ -89,11 +95,12 @@ class ScheduleTask {
         other.id == id &&
         other.title == title &&
         other.scheduledTime == scheduledTime &&
-        other.status == status;
+        other.status == status &&
+        other.voiceNotePath == voiceNotePath;
   }
 
   @override
   int get hashCode {
-    return Object.hash(id, title, scheduledTime, status);
+    return Object.hash(id, title, scheduledTime, status, voiceNotePath);
   }
 }

@@ -3,6 +3,7 @@ import '../models/schedule_task.dart';
 import '../services/db_service.dart';
 import '../services/notification_service.dart';
 import '../widgets/add_task_sheet.dart';
+import '../widgets/voice_schedule_sheet.dart';
 import '../widgets/confirmation_dialog.dart';
 import '../widgets/edit_task_sheet.dart';
 import '../widgets/permission_dialog.dart';
@@ -643,22 +644,43 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ],
             )
           : null,
-      floatingActionButton: _currentNavigationIndex == 0
-          ? FloatingActionButton.extended(
-              backgroundColor: emeraldGreen,
-              foregroundColor: Colors.white,
-              elevation: 4,
-              icon: const Icon(Icons.add_rounded),
-              label: const Text(
-                'Add Task',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              onPressed: () {
-                AddTaskSheet.show(
-                  context,
-                  onTaskAdded: _loadTasks,
-                );
-              },
+      floatingActionButton: (_currentNavigationIndex == 0 || _currentNavigationIndex == 1)
+          ? Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                FloatingActionButton(
+                  heroTag: 'voice_scheduler_fab',
+                  backgroundColor: const Color(0xFF1F2937),
+                  foregroundColor: emeraldGreen,
+                  elevation: 4,
+                  tooltip: 'Voice Scheduler',
+                  onPressed: () {
+                    VoiceScheduleSheet.show(
+                      context,
+                      onTaskAdded: _loadTasks,
+                    );
+                  },
+                  child: const Icon(Icons.mic_rounded, size: 26),
+                ),
+                const SizedBox(width: 12),
+                FloatingActionButton.extended(
+                  heroTag: 'add_task_fab',
+                  backgroundColor: emeraldGreen,
+                  foregroundColor: Colors.white,
+                  elevation: 4,
+                  icon: const Icon(Icons.add_rounded),
+                  label: const Text(
+                    'Add Task',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  onPressed: () {
+                    AddTaskSheet.show(
+                      context,
+                      onTaskAdded: _loadTasks,
+                    );
+                  },
+                ),
+              ],
             )
           : null,
       bottomNavigationBar: NavigationBar(

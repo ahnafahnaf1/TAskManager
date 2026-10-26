@@ -35,6 +35,8 @@ void main() {
     await tester.pumpAndSettle();
 
     // Tap Alarm Testing Station to open testing modal
+    await tester.ensureVisible(find.text('Alarm Testing Station'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Alarm Testing Station'));
     await tester.pumpAndSettle();
 

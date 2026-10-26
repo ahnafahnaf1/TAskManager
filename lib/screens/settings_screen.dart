@@ -2,7 +2,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../services/notification_service.dart';
+import '../services/gemini_service.dart';
+import '../services/db_service.dart';
 import '../widgets/confirmation_dialog.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -19,6 +22,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _exactAlarmsAllowed = false;
   bool _batteryIgnored = false;
   bool _isLoadingPermissions = true;
+  bool _playVoiceNoteOnAlarm = true;
 
   // Ringtone Selector State
   String _selectedRingtoneId = 'alarm_digital';
@@ -62,12 +66,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final notifs = await NotificationService.instance.checkNotificationPermission();
     final exact = await NotificationService.instance.checkExactAlarmPermission();
     final battery = await NotificationService.instance.isBatteryOptimizationIgnored();
+    String? voiceNoteSetting;
+    try {
+      voiceNoteSetting = await DBService.instance.getSetting('play_voice_note_on_alarm', defaultValue: 'true');
+    } catch (_) {}
 
     if (mounted) {
       setState(() {
         _notificationsAllowed = notifs;
         _exactAlarmsAllowed = exact;
         _batteryIgnored = battery;
+        _playVoiceNoteOnAlarm = voiceNoteSetting != 'false';
         _isLoadingPermissions = false;
         _alertIntervalMinutes = NotificationService.instance.alertIntervalMinutes;
         _alertWindowMinutes = NotificationService.instance.alertWindowMinutes;
@@ -1569,6 +1578,230 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  // --- 5.5 MODAL: GEMINI AI VOICE SCHEDULER ---
+  void _openGeminiModal() {
+    final apiKeyController = TextEditingController();
+    bool isSaving = false;
+    bool isValidating = false;
+    String? validationMsg;
+    bool? isValid;
+
+    GeminiService.instance.getApiKey().then((key) {
+      if (key != null) {
+        apiKeyController.text = key;
+      }
+    });
+
+    _showModalPopup(
+      context: context,
+      title: 'Gemini AI Voice Scheduler',
+      icon: Icons.auto_awesome_rounded,
+      builder: (mCtx, mSetState) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: emeraldGreen.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: emeraldGreen.withValues(alpha: 0.3)),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.mic_rounded, color: emeraldGreen, size: 24),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Schedule tasks effortlessly by speaking naturally in any language or Tanglish. Gemini Flash AI automatically recognizes the date, time, and title.',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w500,
+                        color: Color(0xFF065F46),
+                        height: 1.3,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Gemini API Key',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF171717)),
+            ),
+            const SizedBox(height: 6),
+            TextField(
+              controller: apiKeyController,
+              style: const TextStyle(fontSize: 13, color: Color(0xFF171717)),
+              decoration: InputDecoration(
+                hintText: 'Paste your API key here (AIza...)',
+                prefixIcon: const Icon(Icons.key_rounded, color: emeraldGreen, size: 20),
+                suffixIcon: IconButton(
+                  icon: const Icon(Icons.clear_rounded, size: 18),
+                  onPressed: () => apiKeyController.clear(),
+                ),
+                filled: true,
+                fillColor: const Color(0xFFF8FAFC),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              ),
+            ),
+            if (validationMsg != null) ...[
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Icon(
+                    isValid == true ? Icons.check_circle_rounded : Icons.error_outline_rounded,
+                    color: isValid == true ? emeraldGreen : const Color(0xFFEF4444),
+                    size: 16,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      validationMsg!,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isValid == true ? emeraldGreen : const Color(0xFFEF4444),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    icon: isValidating
+                        ? const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: emeraldGreen),
+                          )
+                        : const Icon(Icons.verified_rounded, size: 16),
+                    label: const Text('Test Key'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: emeraldGreen,
+                      side: const BorderSide(color: emeraldGreen),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    onPressed: isValidating
+                        ? null
+                        : () async {
+                            final key = apiKeyController.text.trim();
+                            if (key.isEmpty) {
+                              mSetState(() {
+                                isValid = false;
+                                validationMsg = 'Please enter an API key first.';
+                              });
+                              return;
+                            }
+                            mSetState(() {
+                              isValidating = true;
+                              validationMsg = null;
+                            });
+                            final ok = await GeminiService.instance.validateApiKey(key);
+                            mSetState(() {
+                              isValidating = false;
+                              isValid = ok;
+                              validationMsg = ok
+                                  ? 'API Key is valid and active!'
+                                  : 'Invalid API key or network error.';
+                            });
+                          },
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    icon: isSaving
+                        ? const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          )
+                        : const Icon(Icons.save_rounded, size: 16),
+                    label: const Text('Save Key'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: emeraldGreen,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    onPressed: isSaving
+                        ? null
+                        : () async {
+                            mSetState(() => isSaving = true);
+                            await GeminiService.instance.saveApiKey(apiKeyController.text.trim());
+                            mSetState(() {
+                              isSaving = false;
+                              isValid = true;
+                              validationMsg = 'Saved successfully!';
+                            });
+                            if (mounted) setState(() {});
+                          },
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Need a Free API Key?',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    '1. Click the button below to open Google AI Studio in your browser.\n2. Sign in with your Google Account and click "Create API key".\n3. Copy and paste it here to save.',
+                    style: TextStyle(fontSize: 11.5, color: Color(0xFF475569), height: 1.4),
+                  ),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    child: TextButton.icon(
+                      style: TextButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: const Color(0xFF1E293B),
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          side: const BorderSide(color: Color(0xFFCBD5E1)),
+                        ),
+                      ),
+                      icon: const Icon(Icons.open_in_browser_rounded, size: 18),
+                      label: const Text('Open Google AI Studio (Free Key)', style: TextStyle(fontWeight: FontWeight.w600)),
+                      onPressed: () async {
+                        final uri = Uri.parse('https://aistudio.google.com/app/apikey');
+                        if (await canLaunchUrl(uri)) {
+                          await launchUrl(uri, mode: LaunchMode.externalApplication);
+                        }
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   // --- 6. MODAL: ABOUT TASK SCHEDULER ---
   void _openAboutModal() {
     _showModalPopup(
@@ -1861,6 +2094,71 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     onTap: _openRingtoneModal,
                   ),
 
+                  // 2.5 Voice Note on Alarm Toggle
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: const Color(0xFFE5E7EB)),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.02),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: emeraldGreen.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(Icons.record_voice_over_rounded, color: emeraldGreen, size: 22),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Play Voice Note on Alarm',
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF171717),
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  _playVoiceNoteOnAlarm
+                                      ? 'Plays your spoken audio note when alarm rings'
+                                      : 'Voice note muted during alarm sound',
+                                  style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Switch(
+                            value: _playVoiceNoteOnAlarm,
+                            activeColor: emeraldGreen,
+                            onChanged: (val) async {
+                              setState(() => _playVoiceNoteOnAlarm = val);
+                              try {
+                                await DBService.instance.setSetting('play_voice_note_on_alarm', val.toString());
+                              } catch (_) {}
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
                   // 3. System Permissions Card
                   _buildSettingTile(
                     icon: Icons.security_rounded,
@@ -1869,6 +2167,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     badgeText: (permissionsOk && _batteryIgnored) ? 'ACTIVE' : 'ACTION REQUIRED',
                     badgeColor: (permissionsOk && _batteryIgnored) ? emeraldGreen : const Color(0xFFEF4444),
                     onTap: _openPermissionsModal,
+                  ),
+
+                  // 3.5 Gemini AI Voice Assistant Card
+                  _buildSettingTile(
+                    icon: Icons.auto_awesome_rounded,
+                    title: 'Gemini AI Voice Scheduler',
+                    subtitle: 'Schedule tasks using voice commands in natural language or Tanglish',
+                    badgeText: 'AI FREE',
+                    badgeColor: const Color(0xFF8B5CF6),
+                    onTap: _openGeminiModal,
                   ),
 
                   const SizedBox(height: 14),

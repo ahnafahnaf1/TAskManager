@@ -4,6 +4,7 @@ import '../models/schedule_task.dart';
 import '../services/db_service.dart';
 import '../services/notification_service.dart';
 import 'confirmation_dialog.dart';
+import 'voice_schedule_sheet.dart';
 
 class AddTaskSheet extends StatefulWidget {
   final VoidCallback onTaskAdded;
@@ -469,6 +470,25 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
                           ],
                         ),
                       ),
+                      IconButton(
+                        tooltip: 'Voice Scheduler',
+                        style: IconButton.styleFrom(
+                          backgroundColor: const Color(0xFF10B981).withValues(alpha: 0.12),
+                        ),
+                        icon: const Icon(
+                          Icons.mic_rounded,
+                          color: Color(0xFF10B981),
+                          size: 22,
+                        ),
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                          VoiceScheduleSheet.show(
+                            context,
+                            onTaskAdded: widget.onTaskAdded,
+                          );
+                        },
+                      ),
+                      const SizedBox(width: 4),
                       IconButton(
                         icon: Icon(
                           Icons.close_rounded,

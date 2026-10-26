@@ -38,7 +38,8 @@ class DBService {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         title TEXT NOT NULL,
         scheduledTime TEXT NOT NULL,
-        status TEXT NOT NULL
+        status TEXT NOT NULL,
+        voiceNotePath TEXT
       )
     ''');
     await db.execute('''
@@ -56,6 +57,11 @@ class DBService {
         value TEXT NOT NULL
       )
     ''');
+    try {
+      await db.execute('ALTER TABLE $tableName ADD COLUMN voiceNotePath TEXT');
+    } catch (_) {
+      // Column already exists, safe to ignore
+    }
   }
 
   /// Inserts a task and returns the inserted autoincrement primary key ID.

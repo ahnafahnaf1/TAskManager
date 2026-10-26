@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/schedule_task.dart';
 import '../services/notification_service.dart';
+import 'voice_note_player_widget.dart';
 
 class TaskTile extends StatefulWidget {
   final ScheduleTask task;
@@ -295,6 +296,12 @@ class _TaskTileState extends State<TaskTile> {
                 ],
               ],
             ),
+
+            // Voice Note Player (if task was created with a voice recording)
+            if (task.voiceNotePath != null && task.voiceNotePath!.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              VoiceNotePlayerWidget(filePath: task.voiceNotePath!),
+            ],
 
             // Next Alert Display Section (Wrapped safely to prevent overflow)
             if (isPending) ...[
